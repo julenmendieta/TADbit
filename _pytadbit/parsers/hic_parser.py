@@ -6,6 +6,8 @@ November 7, 2013.
 from warnings import warn
 from math import sqrt, isnan
 from pytadbit.parsers.gzopen import gzopen
+from pytadbit.interaction_matrix import InteractionMatrix
+
 
 HIC_DATA = True
 
@@ -154,13 +156,13 @@ def read_matrix(things, parser=None, hic=True):
         things = [things]
     matrices = []
     for thing in things:
-        if isinstance(thing, HiC_data):
+        if isinstance(thing, InteractionMatrix):
             matrices.append(thing)
         elif isinstance(thing, file):
             matrix, size = parser(thing)
             thing.close()
-            matrices.append(HiC_data([(i, matrix[i]) for i in xrange(size**2)
-                                      if matrix[i]], size))
+            matrices.append(InteractionMatrix([(i, matrix[i]) for i in xrange(size**2)
+                                               if matrix[i]], size))
         elif isinstance(thing, str):
             try:
                 matrix, size = parser(gzopen(thing))
@@ -169,8 +171,8 @@ def read_matrix(things, parser=None, hic=True):
                     matrix, size = parser(thing.split('\n'))
                 else:
                     raise IOError('\n   ERROR: file %s not found\n' % thing)
-            matrices.append(HiC_data([(i, matrix[i]) for i in xrange(size**2)
-                                      if matrix[i]], size))
+            matrices.append(InteractionMatrix([(i, matrix[i]) for i in xrange(size**2)
+                                               if matrix[i]], size))
         elif isinstance(thing, list):
             if all([len(thing)==len(l) for l in thing]):
                 matrix  = reduce(lambda x, y: x+y, thing)
@@ -178,8 +180,8 @@ def read_matrix(things, parser=None, hic=True):
             else:
                 print thing
                 raise Exception('must be list of lists, all with same length.')
-            matrices.append(HiC_data([(i, matrix[i]) for i in xrange(size**2)
-                                      if matrix[i]], size))
+            matrices.append(InteractionMatrix([(i, matrix[i]) for i in xrange(size**2)
+                                               if matrix[i]], size))
         elif isinstance(thing, tuple):
             # case we know what we are doing and passing directly list of tuples
             matrix = thing
@@ -187,8 +189,8 @@ def read_matrix(things, parser=None, hic=True):
             if int(siz) != siz:
                 raise AttributeError('ERROR: matrix should be square.\n')
             size = int(siz)
-            matrices.append(HiC_data([(i, matrix[i]) for i in xrange(size**2)
-                                      if matrix[i]], size))
+            matrices.append(InteractionMatrix([(i, matrix[i]) for i in xrange(size**2)
+                                               if matrix[i]], size))
         elif 'matrix' in str(type(thing)):
             try:
                 row, col = thing.shape
@@ -198,82 +200,10 @@ def read_matrix(things, parser=None, hic=True):
                 size = row
             except Exception as exc:
                 print 'Error found:', exc
-            matrices.append(HiC_data([(i, matrix[i]) for i in xrange(size**2)
-                                      if matrix[i]], size))
+            matrices.append(InteractionMatrix([(i, matrix[i]) for i in xrange(size**2)
+                                               if matrix[i]], size))
         else:
             raise Exception('Unable to read this file or whatever it is :)')
         
     return matrices
 
-
-class HiC_data(dict):
-    """
-    This may also hold the print/write-to-file matrix functions
-    """
-    def __init__(self, items, size):
-        super(HiC_data, self).__init__(items)
-        self.__size = size
-        self._size2 = size**2
-        self.bias = None
-
-    def __len__(self):
-        return self.__size
-
-    def __getitem__(self, row_col):
-        """
-        slow one... for user
-        for fast item getting, use self.get()
-        """
-        try:
-            row, col = row_col
-            pos = row * self.__size + col
-            if pos > self._size2:
-                raise IndexError(
-                    'ERROR: row or column larger than %s' % self.__size)
-            return self.get(pos, 0)
-        except TypeError:
-            if row_col > self._size2:
-                raise IndexError(
-                    'ERROR: position %d larger than %s^2' % (row_col,
-                                                             self.__size))
-            return self.get(row_col, 0)
-
-
-    def get_as_tuple(self):
-        return tuple([self[i, j] for j  in xrange(len(self)) for i in xrange(len(self))])
-
-    def get_matrix(self, focus=None, diagonal=True, normalized=False):
-        """
-        get the matrix
-        """
-        siz = len(self)
-        if normalized and not self.bias:
-            raise Exception('ERROR: experiment not normalized yet')
-        if focus:
-            start, end = focus
-            start -= 1
-        else:
-            start = 0
-            end   = siz
-        if normalized:
-            if diagonal:
-                return [[self[i, j] / self.bias[i] / self.bias[j]
-                         for i in xrange(start, end)]
-                        for j in xrange(start, end)]
-            else:
-                mtrx = [[self[i, j] / self.bias[i] / self.bias[j]
-                         for i in xrange(start, end)]
-                        for j in xrange(start, end)]
-                for i in xrange(start, end):
-                    mtrx[i][i] = 1 if mtrx[i][i] else 0
-                return mtrx
-        else:
-            if diagonal:
-                return [[self[i, j] for i in xrange(start, end)]
-                        for j in xrange(start, end)]
-            else:
-                mtrx = [[self[i, j] for i in xrange(start, end)]
-                        for j in xrange(start, end)]
-                for i in xrange(start, end):
-                    mtrx[i][i] = 1 if mtrx[i][i] else 0
-                return mtrx

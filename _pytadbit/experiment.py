@@ -481,7 +481,7 @@ class Experiment(object):
                 self._normalization = 'visibility'
 
 
-    def normalize_hic(self, factor=1, iterations=0, silent=False, rowsums=None):
+    def normalize_hic(self, factor=1, iterations=0, silent=False):
         """
         Normalize the Hi-C data. This normalization step does the same of
         the :func:`pytadbit.tadbit.tadbit` function (default parameters),
@@ -506,7 +506,6 @@ class Experiment(object):
         :param 1 factor: final mean number of normalized interactions wanted
            per cell
         :param False silent: does not warn when overwriting weights
-        :param None rowsums: input a list of rowsums calculated elsewhere
         """
 
         if not self.hic_data:
