@@ -82,11 +82,17 @@ def autoreader(f):
             # Case 4: matrix with header and row information.
             header = True
             trim = ncol - nrow + 1
-    # Remove header line if needed.
-    if header:
+    # Keep header line
+    if header and not trim:
+        header = items.pop(0)
+        nrow -= 1
+    elif not trim:
+        header = range(1, nrow + 1)
+    else:
         del(items[0])
         nrow -= 1
-
+        header = [tuple([a for a in line[:trim]]) for line in items]
+    print 'HEADER', header
     # Get the numeric values and remove extra columns
     what = int if HIC_DATA else float
     try:
@@ -117,7 +123,7 @@ def autoreader(f):
         warn('WARNING: input matrix not symmetric: symmetrizing')
         symmetrize(items)
 
-    return tuple([a for line in items for a in line]), ncol
+    return tuple([a for line in items for a in line]), ncol, header
 
 
 def read_matrix(things, parser=None, hic=True):
@@ -159,20 +165,20 @@ def read_matrix(things, parser=None, hic=True):
         if isinstance(thing, InteractionMatrix):
             matrices.append(thing)
         elif isinstance(thing, file):
-            matrix, size = parser(thing)
+            matrix, size, header = parser(thing)
             thing.close()
             matrices.append(InteractionMatrix([(i, matrix[i]) for i in xrange(size**2)
                                                if matrix[i]], size))
         elif isinstance(thing, str):
             try:
-                matrix, size = parser(gzopen(thing))
+                matrix, size, header = parser(gzopen(thing))
             except IOError:
                 if len(thing.split('\n')) > 1:
-                    matrix, size = parser(thing.split('\n'))
+                    matrix, size, header = parser(thing.split('\n'))
                 else:
                     raise IOError('\n   ERROR: file %s not found\n' % thing)
             matrices.append(InteractionMatrix([(i, matrix[i]) for i in xrange(size**2)
-                                               if matrix[i]], size))
+                                               if matrix[i]], size, sections=header))
         elif isinstance(thing, list):
             if all([len(thing)==len(l) for l in thing]):
                 matrix  = reduce(lambda x, y: x+y, thing)
@@ -204,6 +210,6 @@ def read_matrix(things, parser=None, hic=True):
                                                if matrix[i]], size))
         else:
             raise Exception('Unable to read this file or whatever it is :)')
-        
+
     return matrices
 

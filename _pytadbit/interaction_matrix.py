@@ -11,20 +11,26 @@ class InteractionMatrix(dict):
     :param None sections: list of descriptors to assign at each row/columns (two
        lists needed if not symmetric). One descriptors can be for example:
        ('Scer', 'chrIV', '50000') or ('chrX', '980000:1000000')
+    :param None section_sizes: a dictionary containing the size of each section,
+       subsection. I.e.: {'Scer': 1200000, ('Scer', 'chrIV'): 150000}
     :param False normalized: if matrix is already normalized
     :param True symmetric: if matrix is symmetric (the case for Hi-C data but
        not for 5-C)
     :param None scale: can be either a single number if all rows represent the
        same number of nucleotides, or a list if not.
     """
-    def __init__(self, items, size, sections=None, normalized=False,
-                 symmetric=True, scale=None):
+    def __init__(self, items, size, name=None, sections=None, normalized=False,
+                 normalization=None, symmetric=True, scale=None,
+                 section_sizes=None):
         super(InteractionMatrix, self).__init__(items)
+        self.name = name
         self._size = size
         self._size2 = size**2
         self.normalized = normalized
+        self._normalization = normalization or 'None'
         self.bias = None
         self.sections = sections
+        self.section_sizes = section_sizes or {}
         self.symmetric = symmetric
         self.scale = scale if (isinstance(scale, list) or
                                isinstance(scale, tuple)) else Scale((scale, ))
@@ -61,8 +67,27 @@ class InteractionMatrix(dict):
 
         :retruns: a new Interaction matrix
         """
-        # TODO
-        pass
+        section_set = set((section,))
+        idxs = [row for row, names in enumerate(self.sections)
+                if not section_set.difference(names)]
+        if 1 + idxs[-1] - idxs[0] != len(idxs):
+            raise Exception('ERROR: section name should correspond to uniq ' +
+                            'section of the matrix')
+        new_im = InteractionMatrix(
+            [], self.section_sizes.get(section, len(idxs)),
+            normalized=self.normalized, symmetric=self.symmetric,
+            section_sizes=dict([(tuple(section_set.difference(k)),
+                                 self.section_sizes[k])
+                                for k in self.section_sizes
+                                if section_set.difference(k)]),
+            normalization=self._normalization + ' inherited', sections = [],
+            name = '_'.join(section))
+        minidx = idxs[0]
+        pos = self.sections[minidx].index(section)
+        for k in idxs:
+            new_im[idxs[k] - minidx] = self[idxs[k]]
+            new_im.sections.append(self.sections[idxs[k]][:pos] +
+                                   self.sections[idxs[k]][pos + 1:])
 
     def get_as_tuple(self):
         """
@@ -106,7 +131,6 @@ class InteractionMatrix(dict):
                 for i in xrange(start, end):
                     mtrx[i][i] = 1 if mtrx[i][i] else 0
                 return mtrx
-
 
 class Scale(tuple):
     def __init__(self, items):

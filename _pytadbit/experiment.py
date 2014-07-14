@@ -4,7 +4,8 @@
 
 """
 
-from pytadbit.parsers.hic_parser   import read_matrix, HiC_data
+from pytadbit.parsers.hic_parser   import read_matrix
+from pytadbit.interaction_matrix   import InteractionMatrix
 from pytadbit.utils.extraviews     import nicer
 from pytadbit.utils.extraviews     import tadbit_savefig
 from pytadbit.utils.tadmaths       import zscore
@@ -175,7 +176,7 @@ class Experiment(object):
                 other.normalize_hic()
             changed_reso = True
         if self.hic_data:
-            new_hicdata = HiC_data([], size=self.size)
+            new_hicdata = InteractionMatrix([], size=self.size)
             for i in self.hic_data[0]:
                 new_hicdata[i] = self.hic_data[0].get(i)
             for i in other.hic_data[0]:
@@ -190,7 +191,7 @@ class Experiment(object):
         if self._normalization != None and other._normalization != None:
             if (self._normalization.split('_factor:')[0] ==
                 other._normalization.split('_factor:')[0]):
-                xpr.norm = [HiC_data([], size=self.size)]
+                xpr.norm = [InteractionMatrix([], size=self.size)]
                 for i in self.norm[0]:
                     xpr.norm[0][i] = self.norm[0].get(i)
                 for i in other.norm[0]:
@@ -299,8 +300,8 @@ class Experiment(object):
         rest = size % fact
         if rest:
             self.size += 1
-        self.hic_data = [HiC_data([], size / fact + (1 if rest else 0))]
-        self.norm     = [HiC_data([], size / fact + (1 if rest else 0))]
+        self.hic_data = [InteractionMatrix([], size / fact + (1 if rest else 0))]
+        self.norm     = [InteractionMatrix([], size / fact + (1 if rest else 0))]
         def resize(mtrx, copee):
             "resize both hic_data and normalized data"
             for i in xrange(0, size, fact):
@@ -516,10 +517,10 @@ class Experiment(object):
         remove = [i in self._zeros for i in xrange(size)]
         self.bias = iterative(self.hic_data[0], iterations=iterations,
                               remove=remove)
-        self.norm = [HiC_data([(i + j * size, float(self.hic_data[0][i, j]) /
-                                self.bias[i] /
-                                self.bias[j] * size)
-                               for i in self.bias for j in self.bias], size)]
+        self.norm = [InteractionMatrix([(i + j * size, float(self.hic_data[0][i, j]) /
+                                         self.bias[i] /
+                                         self.bias[j] * size)
+                                        for i in self.bias for j in self.bias], size)]
         # no need to use lists, tuples use less memory
         if factor:
             self._normalization = 'visibility_factor:' + str(factor)

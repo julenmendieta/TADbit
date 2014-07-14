@@ -2,6 +2,53 @@
 20 juin 2014
 
 Implementation of iterative correction Imakaev 2012
+
+Schematic flow chart for five iterations (it = 0->5) starting from the symmetric
+matrix W of size N:
+
+   +---------->  Wij
+   |    
+   |              |
+   |              v
+   |             __
+   |             \
+   |        Si = /_    Wij
+   |            j=0->N
+   |    
+   |              |
+   |              v
+   |    
+   |                   _
+   |        DBi = Si / S
+   |    
+   |              |
+   |              v
+   |    
+   |        Bi = Bi x DBi             ---> keep track, used as expected value
+   |    
+   |              |
+   |              v
+   |    
+   |                 Wij
+   |       Wij = -----------
+   |              DBi x DBj  
+   |    
+   |              |
+   |        it<5 / \ it=5
+   |____________/   \_________   TADbit          _           
+    it++                     \`----------> Wij / S    meaning that: Si = O(1)
+                             |                        ('Si' tends towards one
+                             |                         when 'it' -> infinite)
+                             |Strict Imakaev
+                             |
+                             v
+                             
+                            Wij
+                          -------  meaning that: Si = 1
+                           ___
+                           \
+                           /__ Wi
+
 """
 
 def _update_S(W):
