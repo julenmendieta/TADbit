@@ -92,7 +92,7 @@ def autoreader(f):
         del(items[0])
         nrow -= 1
         header = [tuple([a for a in line[:trim]]) for line in items]
-    print 'HEADER', header
+    # print 'HEADER', header
     # Get the numeric values and remove extra columns
     what = int if HIC_DATA else float
     try:
@@ -184,7 +184,7 @@ def read_matrix(things, parser=None, hic=True):
                 matrix  = reduce(lambda x, y: x+y, thing)
                 size = len(thing)
             else:
-                print thing
+                # print thing
                 raise Exception('must be list of lists, all with same length.')
             matrices.append(InteractionMatrix([(i, matrix[i]) for i in xrange(size**2)
                                                if matrix[i]], size))

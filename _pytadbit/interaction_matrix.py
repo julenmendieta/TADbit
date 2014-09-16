@@ -4,24 +4,21 @@
 
 class InteractionMatrix(dict):
     """
-    This may also hold the print/write-to-file matrix functions
+    TODO: This may also hold the print/write-to-file matrix functions
 
     :param items: list of key, values
     :param size: size of the matrix
-    :param None sections: list of descriptors to assign at each row/columns (two
-       lists needed if not symmetric). One descriptors can be for example:
+    :param None sections: list of descriptors to assign at each row/columns.
+       One descriptors can be for example:
        ('Scer', 'chrIV', '50000') or ('chrX', '980000:1000000')
     :param None section_sizes: a dictionary containing the size of each section,
        subsection. I.e.: {'Scer': 1200000, ('Scer', 'chrIV'): 150000}
     :param False normalized: if matrix is already normalized
-    :param True symmetric: if matrix is symmetric (the case for Hi-C data but
-       not for 5-C)
     :param None scale: can be either a single number if all rows represent the
        same number of nucleotides, or a list if not.
     """
     def __init__(self, items, size, name=None, sections=None, normalized=False,
-                 normalization=None, symmetric=True, scale=None,
-                 section_sizes=None):
+                 normalization=None, scale=None, section_sizes=None):
         super(InteractionMatrix, self).__init__(items)
         self.name = name
         self._size = size
@@ -29,9 +26,26 @@ class InteractionMatrix(dict):
         self.normalized = normalized
         self._normalization = normalization or 'None'
         self.bias = None
-        self.sections = sections
-        self.section_sizes = section_sizes or {}
-        self.symmetric = symmetric
+        if not sections:
+            # create sections...
+            self.sections = [(item, ) for item in items]
+        else:
+            self.sections = sections
+
+        # calculate the size of each section
+        if not section_sizes:
+            self.section_sizes = {}
+            for section in self.sections:
+                key = tuple((section[0],))
+                self.section_sizes.setdefault(key, 0)
+                self.section_sizes[key] += 1
+                for i in section[1:-1]:
+                    key += tuple((i,))
+                    self.section_sizes.setdefault(key, 0)
+                    self.section_sizes[key] += 1
+        else:
+            self.section_sizes = section_sizes
+
         self.scale = scale if (isinstance(scale, list) or
                                isinstance(scale, tuple)) else Scale((scale, ))
 
@@ -44,7 +58,7 @@ class InteractionMatrix(dict):
         for fast item getting, use self.get()
         """
         try:
-            row, col = sorted(row_col) if self.symmetric else row_col
+            row, col = sorted(row_col)
             pos = row * self._size + col
             if pos > self._size2:
                 raise IndexError(
@@ -75,7 +89,7 @@ class InteractionMatrix(dict):
                             'section of the matrix')
         new_im = InteractionMatrix(
             [], self.section_sizes.get(section, len(idxs)),
-            normalized=self.normalized, symmetric=self.symmetric,
+            normalized=self.normalized,
             section_sizes=dict([(tuple(section_set.difference(k)),
                                  self.section_sizes[k])
                                 for k in self.section_sizes
