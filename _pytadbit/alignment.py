@@ -23,7 +23,7 @@ class Alignment(object):
     """
     def __init__(self, name, alignment, experiments, score=None):
         self.name = name
-        self.__experiments = experiments
+        self.__experiments = dict([(e.name, e) for e in experiments])
         self.__values = []        
         self.__keys = []
         self.__len = None
@@ -443,6 +443,66 @@ def _interpolation(experiments):
     #plt.hist(norm_tads, normed=True, bins=20, cumulative=True)
     #plt.show()
     return interp1d(win, cnt)
+
+
+
+def align_experiments(xpers, verbose=False, randomize=False,
+                      rnd_method='interpolate', rnd_num=1000,
+                      **kwargs):
+    """
+    Align the predicted boundaries of two different experiments. The 
+    resulting alignment will be stored in the self.experiment list.
+
+    :param None names: list of names of the experiments to align. If None,
+        align all
+    :param experiment1: name of the first experiment to align
+    :param experiment2: name of the second experiment to align
+    :param -0.1 penalty: penalty for inserting a gap in the alignment
+    :param 100000 max_dist: maximum distance between two boundaries
+        allowing match (100Kb seems fair with HUMAN chromosomes)
+    :param False verbose: if True, print some information about the 
+        alignments
+    :param False randomize: check the alignment quality by comparing
+        randomized boundaries over Chromosomes of the same size. This will
+        return a extra value, the p-value of accepting that the observed
+        alignment is not better than a random alignment
+    :param interpolate rnd_method: by default uses the interpolation of TAD
+       distribution. The alternative method is 'shuffle', where TADs are
+       simply shuffled
+    :param 1000 rnd_num: number of randomizations to do
+    :param reciprocal method: if global, Needleman-Wunsch is used to align
+        (see :func:`pytadbit.boundary_aligner.globally.needleman_wunsch`);
+        if reciprocal, a method based on reciprocal closest boundaries is
+        used (see :func:`pytadbit.boundary_aligner.reciprocally.reciprocal`)
+
+    :returns: the alignment and the score of the alignment (by default)
+    """
+    tads = []
+    for xpr in xpers:
+        if not xpr.tads:
+            raise Exception('No TADs defined, use find_tad function.\n')
+        tads.append([xpr.tads[x]['brk'] * xpr.resolution for x in xpr.tads
+                     if xpr.tads[x]['score']])
+    # new
+    aligneds, score = align(tads, verbose=verbose, **kwargs)
+    name = tuple(sorted([x.name for x in xpers]))
+    ali = Alignment(name, aligneds, xpers, score=score)
+    if verbose:
+        print ali
+    # old
+    # self.alignment[name] = {}
+    # for xpr, ali in zip(xpers, aligneds):
+    #     self.alignment[name][xpr.name] = ali
+    # if verbose:
+    #     self.print_alignment(xpers=xpers)
+    if not randomize:
+        # return self.get_alignment(name), score
+        return ali
+    p_value = randomization_test(xpers, score=score, rnd_method=rnd_method,
+                                 verbose=verbose,
+                                 r_size=xpers[0].size * xpers[0].resolution,
+                                 num=rnd_num, **kwargs)
+    return score, p_value
 
 
 def randomization_test(xpers, score=None, num=1000, verbose=False, max_dist=100000,
