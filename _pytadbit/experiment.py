@@ -1104,9 +1104,13 @@ class Experiment(object):
             cbar = axe.figure.colorbar(img)
             cbar.ax.set_ylabel('%sHi-C %sinteraction count' % (
                 'Log2 ' * logarithm, 'normalized ' * normalized), rotation=-90)
-            axe.set_title(('Chromosome %s experiment %s %s') % (
-                self.crm.name, self.name,
-                'focus: %s-%s' % (start, end) if tad else ''))
+            try:
+                axe.set_title(('Chromosome %s experiment %s %s') % (
+                    self.crm.name, self.name,
+                    'focus: %s-%s' % (start, end) if tad else ''))
+            except AttributeError:
+                axe.set_title(('Experiment %s %s') % (
+                    self.name, 'focus: %s-%s' % (start, end) if tad else ''))
             axe.set_xlabel('Genomic bin (resolution: %s)' % (self.resolution))
             if paint_tads:
                 axe.set_ylabel('TAD number')
