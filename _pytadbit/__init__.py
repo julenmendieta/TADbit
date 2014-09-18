@@ -12,6 +12,7 @@ from pytadbit.imp.impmodel             import load_impmodel_from_cmm
 from pytadbit.imp.impmodel             import load_impmodel_from_xyz
 from pytadbit.imp.impmodel             import IMPmodel
 from pytadbit.boundary_aligner.aligner import align
+from pytadbit.visual.heatmaps          import interaction_map
 try:
     from pytadbit.imp.impoptimizer import IMPoptimizer
 except ImportError:

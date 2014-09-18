@@ -7,7 +7,6 @@ from os.path                           import exists
 from pytadbit.boundary_aligner.aligner import align
 from pytadbit                          import tadbit
 from pytadbit.utils.extraviews         import tadbit_savefig
-from pytadbit.utils.extraviews         import _tad_density_plot
 from pytadbit.experiment               import Experiment
 from pytadbit.utils.hic_filtering      import hic_filtering_for_modelling
 from string                            import ascii_lowercase as letters
@@ -423,35 +422,6 @@ class Chromosome(object):
         self.r_size = self.size - len(self.forbidden) * xpr.resolution
         self.r_size = RelativeChromosomeSize(self.size)
 
-
-    def tad_density_plot(self, name, axe=None, focus=None, extras=None,
-                         normalized=True, savefig=None, shape='ellipse'):
-        """
-        Draw an summary of the TAD found in a given experiment and their density
-        in terms of relative Hi-C interaction count.
-        
-        :param name: name of the experiment to visualize
-        :param None focus: can pass a tuple (bin_start, bin_stop) to display the
-           alignment between these genomic bins
-        :param None extras: list of coordinates (genomic bin) where to draw a
-           red cross
-        :param None ymax: limit the y axis up to a given value
-        :param ('grey', ): successive colors for alignment
-        :param True normalized: normalized Hi-C count are plotted instead of raw
-           data.
-        :param 'ellipse' shape: which kind of shape to use as schematic
-           representation of TADs. Implemented: 'ellipse', 'rectangle',
-           'triangle'
-        :param None savefig: path to a file where to save the image generated;
-           if None, the image will be shown using matplotlib GUI (the extension
-           of the file name will determine the desired format).
-        """
-        if not self.experiments[name].tads:
-            raise Exception("TAD borders not found\n")
-        _tad_density_plot(self.experiments[name], axe=axe, focus=focus,
-                          extras=extras, normalized=normalized,
-                          savefig=savefig, shape=shape)
-        
 
     def get_tad_hic(self, tad, x_name, normed=True, matrix_num=0):
         """

@@ -5,7 +5,7 @@
 """
 
 from pytadbit.utils.extraviews         import colorize, tadbit_savefig
-from pytadbit.utils.extraviews         import _tad_density_plot
+from pytadbit.visual.tad_plot          import _tad_density_plot
 from random                            import random, shuffle
 from sys                               import stdout
 from pytadbit.boundary_aligner.aligner import align

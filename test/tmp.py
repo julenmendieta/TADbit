@@ -11,7 +11,8 @@ from os                              import system, path, chdir
 from warnings                        import warn
 from distutils.spawn                 import find_executable
 from pytadbit.visual.heatmap         import interaction_map
-
+from pytadbit import find_tads
+from pytadbit.visual.tad_plot         import tad_density_plot
 
 PATH = '/Users/fransua/Box/tadbits/tadbit-1.0/test/'
 experiments = {}
@@ -25,5 +26,11 @@ experiments['exp3'] = Experiment('exp3', resolution=20000,
 experiments['exp4'] = Experiment('exp4', resolution=20000,
                                  hic_data=PATH + '/40Kb/chrT/chrT_D.tsv')
 
+interaction_map([(experiments['exp1'], experiments['exp2']), experiments['exp1'], experiments['exp2']])
+
+
+find_tads(experiments['exp1'])
+
+tad_density_plot(experiments['exp1'])
 
 
