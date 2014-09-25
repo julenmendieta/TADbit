@@ -8,8 +8,22 @@ from math import sqrt, isnan
 from pytadbit.parsers.gzopen import gzopen
 from pytadbit.interaction_matrix import InteractionMatrix
 
+import re
 
 HIC_DATA = True
+
+
+def extract_headers(rownames, colnames, header_re=None):
+    if not header_re:
+        header_re = '|([^:]+):([0-9]+)-([0-9]+)'
+    if isinstance(header_re, str):
+        header_re = [header_re]
+    for i in xrange(len(rownames)):
+        rownames[i] = [re.findall(header_re[j], rownames[i][j])[0]
+                       for j, r in enumerate(header_re)]
+    for i in xrange(len(colnames)):
+        colnames[i] = [re.findall(header_re[j], colnames[i][j])[0]
+                       for j, r in enumerate(header_re)]        
 
 # Exception to handle failed autoread.
 class AutoReadFail(Exception):
@@ -34,7 +48,7 @@ def symmetrize(matrix):
             matrix[i][j] = matrix[j][i] = matrix[i][j] + matrix[j][i]
 
 
-def autoreader(f):
+def autoreader(f, header_re=None):
     """
     Auto-detect matrix format of HiC data file.
     
@@ -47,7 +61,7 @@ def autoreader(f):
     # Skip initial comment lines and read in the whole file
     # as a list of lists.
     for line in f:
-        if line[0] != '#':
+        if not line.startswith('#'):
             break
     items = [line.split()] + [line.split() for line in f]
 
@@ -64,34 +78,53 @@ def autoreader(f):
     nrow = len(items)
     # Auto-detect the format, there are only 4 cases.
     if ncol == nrow:
+        print 'SAME NUMBER OF ROW COLUMNS'
         try:
             _ = [float(item) for item in items[0]]
             # Case 1: pure number matrix.
+            print '  no header'
             header = False
             trim = 0
         except ValueError:
             # Case 2: matrix with row and column names.
+            print '  header'
             header = True
-            trim = 1
+            if header_re:
+                trim = len(header_re)
+            else:
+                trim = 1
     else:
+        print 'DIFFERENT NUMBER OF ROW COLUMNS', len(items[0]), len(items[1]), nrow, ncol
         if len(items[0]) == len(items[1]):
             # Case 3: matrix with row information.
+            print '  no header'
             header = False
-            trim = ncol - nrow
+            if header_re:
+                trim = len(header_re)
+            else:
+                trim = ncol - nrow
         else:
             # Case 4: matrix with header and row information.
+            print '  header'
             header = True
-            trim = ncol - nrow + 1
+            if header_re:
+                trim = len(header_re)
+            else:
+                trim = ncol - nrow + 1
     # Keep header line
     if header and not trim:
-        header = items.pop(0)
+        rownames = items.pop(0)
         nrow -= 1
     elif not trim:
-        header = range(1, nrow + 1)
+        rownames = range(1, nrow + 1)
     else:
         del(items[0])
         nrow -= 1
-        header = [tuple([a for a in line[:trim]]) for line in items]
+        rownames = [tuple([a for a in line[:trim]]) for line in items]
+    if trim:
+        colnames = [c for c in items[0] if c]
+
+    extract_headers(colnames, rownames, header_re)
     # print 'HEADER', header
     # Get the numeric values and remove extra columns
     what = int if HIC_DATA else float
@@ -123,10 +156,10 @@ def autoreader(f):
         warn('WARNING: input matrix not symmetric: symmetrizing')
         symmetrize(items)
 
-    return tuple([a for line in items for a in line]), ncol, header
+    return tuple([a for line in items for a in line]), ncol, (rownames, colnames)
 
 
-def read_matrix(things, parser=None, hic=True):
+def read_matrix(things, parser=None, hic=True, **kwargs):
     """
     Read and checks a matrix from a file (using
     :func:`pytadbit.parser.hic_parser.autoreader`) or a list.
@@ -165,16 +198,16 @@ def read_matrix(things, parser=None, hic=True):
         if isinstance(thing, InteractionMatrix):
             matrices.append(thing)
         elif isinstance(thing, file):
-            matrix, size, header = parser(thing)
+            matrix, size, header = parser(thing, **kwargs)
             thing.close()
             matrices.append(InteractionMatrix([(i, matrix[i]) for i in xrange(size**2)
                                                if matrix[i]], size))
         elif isinstance(thing, str):
             try:
-                matrix, size, header = parser(gzopen(thing))
+                matrix, size, header = parser(gzopen(thing, **kwargs))
             except IOError:
                 if len(thing.split('\n')) > 1:
-                    matrix, size, header = parser(thing.split('\n'))
+                    matrix, size, header = parser(thing.split('\n'), **kwargs)
                 else:
                     raise IOError('\n   ERROR: file %s not found\n' % thing)
             matrices.append(InteractionMatrix([(i, matrix[i]) for i in xrange(size**2)

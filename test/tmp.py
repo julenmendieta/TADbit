@@ -33,4 +33,17 @@ find_tads(experiments['exp1'])
 
 tad_density_plot(experiments['exp1'])
 
+Experiment('exp4', resolution=20000, hic_data=PATH + '/40Kb/chrT/chrT_D.tsv')
+
+from pytadbit                        import Chromosome, Experiment, load_chromosome
+exp = Experiment('hola', hic_data='/Users/fransua/Downloads/visualizingthesematricesintadbit/6711_HFSP-MCF7-E3h-R2-AA.matrix')
+
+
+
+
+
+
+
+
+
 

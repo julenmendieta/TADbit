@@ -12,6 +12,7 @@ from pytadbit.utils.tadmaths       import zscore
 from pytadbit.utils.normalize_hic  import iterative
 from pytadbit.utils.hic_filtering  import hic_filtering_for_modelling
 from pytadbit.parsers.tad_parser   import parse_tads
+from pytadbit.interaction_matrix   import Scale
 from math                          import sqrt, isnan
 from numpy                         import log2, array
 from pytadbit.imp.CONFIG           import CONFIG
@@ -93,12 +94,15 @@ class Experiment(object):
     """
 
 
-    def __init__(self, name, resolution, hic_data=None, norm_data=None,
+    def __init__(self, name, resolution=None, hic_data=None, norm_data=None,
                  tad_def=None, parser=None, no_warn=False, weights=None,
                  conditions=None, identifier=None,
                  cell_type=None, enzyme=None, exp_type='Hi-C', **kw_descr):
         self.name            = name
-        self.resolution      = resolution
+        self.resolution = resolution if (isinstance(resolution, list) or
+                                         isinstance(resolution, tuple) or
+                                         resolution is None
+                                         ) else Scale((resolution, ))
         self.identifier      = identifier
         self.cell_type       = cell_type
         self.enzyme          = enzyme
@@ -410,7 +414,8 @@ class Experiment(object):
         self._ori_size       = self.size       = len(self.hic_data[0])
         self._ori_resolution = self.resolution = data_resolution or self._ori_resolution
         wanted_resolution = wanted_resolution or self.resolution
-        self.set_resolution(wanted_resolution, keep_original=False)
+        if wanted_resolution:
+            self.set_resolution(wanted_resolution, keep_original=False)
 
 
     def load_norm_data(self, norm_data, parser=None, resolution=None,
