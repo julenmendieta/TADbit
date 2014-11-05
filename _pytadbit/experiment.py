@@ -119,6 +119,7 @@ class Experiment(object):
         self._filtered_cols  = False
         self._zeros          = {}
         self._zscores        = {}
+        
         if hic_data:
             self.load_hic_data(hic_data, parser, **kw_descr)
         if norm_data:

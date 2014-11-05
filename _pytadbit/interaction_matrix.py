@@ -2,38 +2,55 @@
 10 juil. 2014
 """
 
+from cPickle import load, dump
+from gzip import open as gopen
+
 class InteractionMatrix(dict):
     """
-    This may also hold the print/write-to-file matrix functions
+    TODO: This may also hold the print/write-to-file matrix functions
 
     :param items: list of key, values
     :param size: size of the matrix
-    :param None sections: list of descriptors to assign at each row/columns (two
-       lists needed if not symmetric). One descriptors can be for example:
+    :param None sections: list of descriptors to assign at each row/columns.
+       One descriptors can be for example:
        ('Scer', 'chrIV', '50000') or ('chrX', '980000:1000000')
     :param None section_sizes: a dictionary containing the size of each section,
        subsection. I.e.: {'Scer': 1200000, ('Scer', 'chrIV'): 150000}
     :param False normalized: if matrix is already normalized
-    :param True symmetric: if matrix is symmetric (the case for Hi-C data but
-       not for 5-C)
     :param None scale: can be either a single number if all rows represent the
        same number of nucleotides, or a list if not.
     """
     def __init__(self, items, size, name=None, sections=None, normalized=False,
-                 normalization=None, symmetric=True, scale=None,
-                 section_sizes=None):
+                 normalization=None, scale=1, section_sizes=None):
         super(InteractionMatrix, self).__init__(items)
-        self.name = name
+        self.name = name or 'NoName'
         self._size = size
         self._size2 = size**2
         self.normalized = normalized
         self._normalization = normalization or 'None'
         self.bias = None
         self.sections = sections
-        self.section_sizes = section_sizes or {}
-        self.symmetric = symmetric
+
+        # calculate the size of each section
+        self.section_sizes = {}
+        if section_sizes:
+            self.section_sizes = section_sizes
+        else:
+            self.__size_sections__()
+
         self.scale = scale if (isinstance(scale, list) or
                                isinstance(scale, tuple)) else Scale((scale, ))
+        self._real_size = sum([self.scale[i] for i in xrange(self._size)])
+
+    def __size_sections__(self):
+        for section in self.sections:
+            key = tuple((section[0],))
+            self.section_sizes.setdefault(key, 0)
+            self.section_sizes[key] += 1
+            for i in section[1:-1]:
+                key += tuple((i,))
+                self.section_sizes.setdefault(key, 0)
+                self.section_sizes[key] += 1
 
     def __len__(self):
         return self._size
@@ -44,7 +61,7 @@ class InteractionMatrix(dict):
         for fast item getting, use self.get()
         """
         try:
-            row, col = sorted(row_col) if self.symmetric else row_col
+            row, col = sorted(row_col)
             pos = row * self._size + col
             if pos > self._size2:
                 raise IndexError(
@@ -57,6 +74,108 @@ class InteractionMatrix(dict):
                                                              self._size))
             return self.get(row_col, 0)
 
+    def write(self, fname, format='pik', gzip=True, headers=True, focus=None):
+        """
+        :param fname: save matrix to file
+        :param pik format: can be either
+            - pik (python pickle object)
+            - mtx (matrix, largest file size)
+            - abc (3 column matrix)
+        :param True header: only used when writting matrices
+        :param None focus: a tuple with (start, end) positions to print. These
+           positions are not genomic coordinates but bin indexes.
+        """
+        thisopen = gopen if gzip else open
+        out = thisopen(fname, 'w' + ('b' if gzip else ''))
+        if focus:
+            if focus[0] < 0 or focus[0] > self._size:
+                raise IndexError('Focus out of bond')
+            thisrange = range(focus[0], focus[1])
+        else:
+            thisrange = range(self._size)
+        if format == 'mtx':
+            out.write('\t' +
+                      '\t'.join([('_'.join(self.sections[i]))
+                                 for i in thisrange]) + '\n')
+            for row in thisrange:
+                if headers:
+                    rowh = '_'.join(self.sections[row])
+                    out.write(rowh + '\t' + '\t'.join(
+                        [str(self[row * self._size + col])
+                         for col in thisrange]) + '\n')
+                else:
+                    out.write('\t'.join(
+                        [str(self[row * self._size + col])
+                         for col in thisrange]) + '\n')
+        elif format == 'pik':
+            if focus:
+                dump(self.get_sample(focus), out)
+            else:
+                dump(self, out)
+        elif format == 'abc':
+            for row in thisrange:
+                rowh = '_'.join(self.sections[row])
+                for col in thisrange:
+                    colh = '_'.join(self.sections[col])
+                    out.write('%s\t%s\t%s\n' % ('_'.join(rowh), '_'.join(colh),
+                                                self[row * self._size + col]))
+        else:
+            out.close()
+            raise NotImplementedError('Format should be one of pik, mtx or abc')
+        out.close()
+
+
+    def get_scaled(self, scale):
+        """
+        Lower the resolution, sections will be unchanged but the last, that will
+        be concatenated.
+        WARNING: this will produce binned data.
+        
+        :param resolution: should be multiple of actual resolution
+        """
+        vals = {}
+        maxlen = max(self.section_sizes.keys(), key=len)
+        newsize = [self.section_sizes[sec] * self.scale / scale
+                   for sec in self.section_sizes if len(sec) == maxlen]
+        newsections = [None for i in xrange(newsize)]
+        for row in xrange(self._size):
+            newrow = row  * self.scale[row] / scale
+            if oldsec and self.sections[row][-2] != oldsec:
+                pass # TODO
+            if newsections[newrow]:
+                newsections[newrow] = self.sections[row]
+            else:
+                newsections[newrow][-1] = None # TODO
+            for col in xrange(self._size):
+                newcol = col * self.scale[col] / scale
+                cell = newcol + newrow * newsize
+                vals.setdefault(cell, 0)
+                vals[cell] += self[row * self._size + col]
+
+        return InteractionMatrix(
+            vals.items(), newsize,
+            normalized=self.normalized,
+            normalization=self._normalization + ' inherited',
+            sections = [self.sections[i] for i in idxs],
+            name = self.name + ('%s-%s' % focus))
+       
+
+    def get_sample(self, focus):
+        """
+        pick portion of the matrix
+        :param None focus: a tuple with (start, end) positions to print. These
+           positions are not genomic coordinates but bin indexes.
+        """
+        idxs = range(focus[0], focus[1])
+        
+        return InteractionMatrix(
+            [(i, self[j]) for i, j in enumerate(idxs)], focus[1] - focus[0],
+            normalized=self.normalized,
+            normalization=self._normalization + ' inherited',
+            sections = [self.sections[i] for i in idxs],
+            name = self.name + ('%s-%s' % focus))
+
+
     def get_section(self, section):
         """
         Get a section of the current interaction matrix, matching with the
@@ -67,15 +186,24 @@ class InteractionMatrix(dict):
 
         :retruns: a new Interaction matrix
         """
-        section_set = set((section,))
+        if isinstance(section, list):
+            section_set = set(tuple(section))
+        elif isinstance(section, str):
+            section_set = set((section,))
+        elif isinstance(section, tuple):
+            section_set = set(section)
+        else:
+            raise NotImplementedError('should pass either list tuple or str')
         idxs = [row for row, names in enumerate(self.sections)
                 if not section_set.difference(names)]
+        if not idxs:
+            raise IndexError('Section(s) not found')
         if 1 + idxs[-1] - idxs[0] != len(idxs):
             raise Exception('ERROR: section name should correspond to uniq ' +
                             'section of the matrix')
         new_im = InteractionMatrix(
             [], self.section_sizes.get(section, len(idxs)),
-            normalized=self.normalized, symmetric=self.symmetric,
+            normalized=self.normalized,
             section_sizes=dict([(tuple(section_set.difference(k)),
                                  self.section_sizes[k])
                                 for k in self.section_sizes
@@ -83,11 +211,15 @@ class InteractionMatrix(dict):
             normalization=self._normalization + ' inherited', sections = [],
             name = '_'.join(section))
         minidx = idxs[0]
-        pos = self.sections[minidx].index(section)
-        for k in idxs:
+        if isinstance(section, str):
+            pos = self.sections[minidx].index(section)
+        else:
+            pos = len(section)
+        for k in xrange(len(idxs)):
             new_im[idxs[k] - minidx] = self[idxs[k]]
             new_im.sections.append(self.sections[idxs[k]][:pos] +
                                    self.sections[idxs[k]][pos + 1:])
+        return new_im
 
     def get_as_tuple(self):
         """

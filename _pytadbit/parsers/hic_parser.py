@@ -92,7 +92,6 @@ def autoreader(f):
         del(items[0])
         nrow -= 1
         header = [tuple([a for a in line[:trim]]) for line in items]
-    print 'HEADER', header
     # Get the numeric values and remove extra columns
     what = int if HIC_DATA else float
     try:
