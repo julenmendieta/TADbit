@@ -29,7 +29,11 @@ class InteractionMatrix(dict):
         self.normalized = normalized
         self._normalization = normalization or 'None'
         self.bias = None
-        self.sections = sections
+        if not sections:
+            # create sections...
+            self.sections = [(item, ) for item in items]
+        else:
+            self.sections = sections
 
         # calculate the size of each section
         self.section_sizes = {}

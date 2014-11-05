@@ -5,8 +5,9 @@ unittest for pytadbit functions
 """
 
 import unittest
-from pytadbit                        import Chromosome, load_chromosome
-from pytadbit                        import tadbit, batch_tadbit
+from pytadbit                        import Chromosome, Experiment, load_chromosome
+from pytadbit                        import tadbit, batch_tadbit, find_tads
+from pytadbit                        import align_experiments
 from pytadbit.tad_clustering.tad_cmo import optimal_cmo
 from pytadbit.imp.structuralmodels   import load_structuralmodels
 from pytadbit.imp.impmodel           import load_impmodel_from_cmm
@@ -95,26 +96,31 @@ class TestTadbit(unittest.TestCase):
         if CHKTIME:
             t0 = time()
 
-        test_chr = Chromosome(name='Test Chromosome', centromere_search=True,
-                              experiment_tads=[exp1, exp2, exp3, exp4],
-                              experiment_hic_data=[
-                                  PATH + '/40Kb/chrT/chrT_A.tsv',
-                                  PATH + '/20Kb/chrT/chrT_B.tsv',
-                                  PATH + '/20Kb/chrT/chrT_C.tsv',
-                                  PATH + '/20Kb/chrT/chrT_D.tsv'],
-                              experiment_names=['exp1', 'exp2', 'exp3', 'exp4'],
-                              experiment_resolutions=[40000,20000,20000,20000],
-                              silent=True)
-        for exp in test_chr.experiments:
+        experiments = {}
+
+        experiments['exp1'] = Experiment('exp1', resolution=40000, tad_def=exp1,
+                                         hic_data=PATH + '/40Kb/chrT/chrT_A.tsv')
+        experiments['exp2'] = Experiment('exp2', resolution=20000, tad_def=exp2,
+                                         hic_data=PATH + '/40Kb/chrT/chrT_B.tsv')
+        experiments['exp3'] = Experiment('exp3', resolution=20000, tad_def=exp3,
+                                         hic_data=PATH + '/40Kb/chrT/chrT_C.tsv')
+        experiments['exp4'] = Experiment('exp4', resolution=20000, tad_def=exp4,
+                                         hic_data=PATH + '/40Kb/chrT/chrT_D.tsv')
+
+        for exp in experiments.values():
             exp.normalize_hic(silent=True, factor=None)
 
-        test_chr.align_experiments(verbose=False, randomize=False,
-                                   method='global')
-        score1, pval1 = test_chr.align_experiments(verbose=False,
-                                                   method='global',
-                                                   randomize=True, rnd_num=100)
-        _, pval2 = test_chr.align_experiments(verbose=False, randomize=True,
-                                              rnd_method='shuffle', rnd_num=100)
+        align_experiments([experiments['exp1'], experiments['exp2'],
+                           experiments['exp3'], experiments['exp4']],
+                          verbose=False, randomize=False, method='global')
+        score1, pval1 = align_experiments([experiments['exp1'], experiments['exp2'],
+                                           experiments['exp3'], experiments['exp4']],
+                                          verbose=False, method='global',
+                                          randomize=True, rnd_num=100)
+        _, pval2 = align_experiments([experiments['exp1'], experiments['exp2'],
+                                      experiments['exp3'], experiments['exp4']],
+                                     verbose=False, randomize=True,
+                                     rnd_method='shuffle', rnd_num=100)
         # Values with alignments obtained with square root normalization.
         #self.assertEqual(round(-26.095, 3), round(score1, 3))
         #self.assertEqual(round(0.001, 1), round(pval1, 1))
@@ -130,17 +136,20 @@ class TestTadbit(unittest.TestCase):
         if CHKTIME:
             t0 = time()
 
-        test_chr = Chromosome(name='Test Chromosome',
-                              experiment_resolutions=[20000]*3,
-                              experiment_hic_data=[
-                                  PATH + '/20Kb/chrT/chrT_A.tsv',
-                                  PATH + '/20Kb/chrT/chrT_D.tsv',
-                                  PATH + '/20Kb/chrT/chrT_C.tsv'],
-                              experiment_names=['exp1', 'exp2', 'exp3'],
-                              silent=True)
-        test_chr.find_tad(['exp1', 'exp2', 'exp3'], batch_mode=True,
-                          verbose=False, silent=True)
-        tads = test_chr.get_experiment('batch_exp1_exp2_exp3').tads
+        experiments = {}
+
+        experiments['exp1'] = Experiment('exp1', resolution=20000, tad_def=exp1,
+                                         hic_data=PATH + '/20Kb/chrT/chrT_A.tsv')
+        experiments['exp2'] = Experiment('exp2', resolution=20000, tad_def=exp2,
+                                         hic_data=PATH + '/20Kb/chrT/chrT_D.tsv')
+        experiments['exp3'] = Experiment('exp3', resolution=20000, tad_def=exp3,
+                                         hic_data=PATH + '/20Kb/chrT/chrT_C.tsv')
+
+        xpr = find_tads([experiments['exp1'],
+                         experiments['exp2'],
+                         experiments['exp3']], batch_mode=True,
+                        verbose=False, silent=True)
+        tads = xpr.tads
         found = [tads[t]['end'] for t in tads if tads[t]['score'] > 0]
         # Values obtained with square root normalization.
         #self.assertEqual([3.0, 8.0, 16.0, 21.0, 28.0, 35.0, 43.0,
@@ -155,17 +164,7 @@ class TestTadbit(unittest.TestCase):
     def test_05_save_load(self):
         if CHKTIME:
             t0 = time()
-
-        test_chr1 = Chromosome(name='Test Chromosome',
-                               experiment_tads=[exp1, exp2],
-                               experiment_names=['exp1', 'exp2'],
-                               experiment_resolutions=[20000,20000],
-                               silent=True)
-        test_chr1.save_chromosome('lolo', force=True)
-        test_chr2 = load_chromosome('lolo')
-        system('rm -f lolo')
-        system('rm -f lolo_hic')
-        self.assertEqual(str(test_chr1.__dict__), str(test_chr2.__dict__))
+        pass # do this for Experiment
         if CHKTIME:
             print '5', time() - t0
 

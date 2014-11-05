@@ -8,8 +8,90 @@ from os                           import path, listdir
 from pytadbit.parsers.hic_parser  import read_matrix
 from pytadbit.tadbit_py           import _tadbit_wrapper
 from pytadbit.tadbitalone_py      import _tadbitalone_wrapper
+from pytadbit.experiment               import Experiment
 from pytadbit.utils.normalize_hic import iterative
 from sys                          import stderr
+
+
+def find_tads(experiments, normalized=True, name=None, n_cpus=1,
+              verbose=True, max_tad_size="auto", heuristic=True,
+              norm='visibility', batch_mode=False, **kwargs):
+    """
+    Call the :func:`pytadbit.tadbit.tadbit` function to calculate the
+    position of Topologically Associated Domain boundaries
+
+    :param experiment: A square matrix of interaction counts of Hi-C
+       data or a list of such matrices for replicated experiments. The
+       counts must be evenly sampled and not normalized. 'experiment'
+       can be either a list of lists, a path to a file or a file handler
+    :param True normalized: if False simple normalization will be computed,
+       as well as a simple column filtering will be applied (remove columns
+       where value at the diagonal is null)
+    :param 1 n_cpus: The number of CPUs to allocate to TADbit. If
+       n_cpus='max' the total number of CPUs will be used
+    :param auto max_tad_size: an integer defining the maximum size of a 
+       TAD. Default (auto) defines it as the number of rows/columns
+    :param True heuristic: whether to use or not some heuristics
+    :param False batch_mode: if True, all the experiments will be 
+       concatenated into one for the search of TADs. The resulting TADs 
+       found are stored under the name 'batch' plus a concatenation of the
+       experiment names passed (e.g.: if experiments=['exp1', 'exp2'], the
+       name would be: 'batch_exp1_exp2').
+
+    """
+    if not isinstance(experiments, list):
+        experiments = [experiments]
+    xprs = experiments
+    if len(xprs) <= 1 and batch_mode:
+        raise Exception('ERROR: batch_mode implies that more than one ' +
+                        'experiment is passed')
+    if batch_mode:
+        matrix = []
+        weight = []
+        if not name:
+            name = 'batch'
+        resolution = xprs[0].resolution
+        for xpr in sorted(xprs, key=lambda x: x.name):
+            if xpr.resolution != resolution:
+                raise Exception('All Experiments must have the same ' +
+                                'resolution\n')
+            matrix.append(xpr.hic_data[0])
+            weight.append(xpr.norm[0] if xpr.norm else None)
+            if name.startswith('batch'):
+                name += '_' + xpr.name
+        if not all(weight):
+            weight = None
+        if normalized:
+            siz = xprs[0].size
+            tmp = reduce(lambda x, y: x+ y, xprs)
+            tmp.filter_columns(silent=kwargs.get('silent', False))
+        remove = tuple([1 if i in tmp._zeros else 0
+                        for i in xrange(siz)]) if normalized else None
+        result = tadbit(matrix,
+                        weights=weight,
+                        remove=remove,
+                        n_cpus=n_cpus, verbose=verbose,
+                        max_tad_size=max_tad_size,
+                        no_heuristic=not heuristic, **kwargs)
+        xpr = Experiment(name, resolution, hic_data=matrix,
+                         tad_def=result, weights=weight, **kwargs)
+        xpr._zeros = xprs[0]._zeros
+        for other in xprs[1:]:
+            xpr._zeros = dict([(k, None) for k in
+                               set(xpr._zeros.keys()).intersection(
+                                   other._zeros.keys())])
+        return xpr
+    for xpr in xprs:
+        result = tadbit(
+            xpr.hic_data,
+            weights=xpr.norm,
+            remove=tuple([1 if i in xpr._zeros else 0 for i in
+                          xrange(xpr.size)]) if normalized else None,
+            n_cpus=n_cpus, verbose=verbose,
+            max_tad_size=max_tad_size,
+            no_heuristic=not heuristic, **kwargs)
+        xpr.load_tad_def(result)
+
 
 def tadbit(x, weights=None, remove=None, n_cpus=1, verbose=True,
            max_tad_size="max", no_heuristic=0, **kwargs):
@@ -62,7 +144,7 @@ def tadbit(x, weights=None, remove=None, n_cpus=1, verbose=True,
                                   for j in xrange(size)]))
     nums = [num.get_as_tuple() for num in nums]
     n_cpus = n_cpus if n_cpus != 'max' else 0
-    max_tad_size = size if max_tad_size is "max" else max_tad_size
+    max_tad_size = size if max_tad_size in ["max", "auto"] else max_tad_size
     _, nbks, passages, _, _, bkpts = \
        _tadbit_wrapper(nums,             # list of lists of Hi-C data
                        remove,           # list of columns marking filtered
