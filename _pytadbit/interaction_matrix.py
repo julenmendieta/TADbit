@@ -21,7 +21,8 @@ class InteractionMatrix(dict):
        same number of nucleotides, or a list if not.
     """
     def __init__(self, items, size, name=None, sections=None, normalized=False,
-                 normalization=None, scale=1, section_sizes=None):
+                 normalization=None, scale=1, section_sizes=None,
+                 ordered_sections=None):
         super(InteractionMatrix, self).__init__(items)
         self.name = name or 'NoName'
         self._size = size
@@ -37,6 +38,7 @@ class InteractionMatrix(dict):
 
         # calculate the size of each section
         self.section_sizes = {}
+        self.ordered_sections = ordered_sections
         if section_sizes:
             self.section_sizes = section_sizes
         else:
@@ -47,12 +49,17 @@ class InteractionMatrix(dict):
         self._real_size = sum([self.scale[i] for i in xrange(self._size)])
 
     def __size_sections__(self):
+        self.ordered_sections = []
         for section in self.sections:
             key = tuple((section[0],))
             self.section_sizes.setdefault(key, 0)
             self.section_sizes[key] += 1
+            if not key in self.ordered_sections:
+                self.ordered_sections.append(key)
             for i in section[1:-1]:
                 key += tuple((i,))
+                if not key in self.ordered_sections:
+                    self.ordered_sections.append(key)
                 self.section_sizes.setdefault(key, 0)
                 self.section_sizes[key] += 1
 
@@ -137,28 +144,54 @@ class InteractionMatrix(dict):
         
         :param resolution: should be multiple of actual resolution
         """
+        # compute new section sizes
+        newsectionsizes = {}
+        ksec = len(max(self.ordered_sections, key=len))
+        total = 0
+        for sec in self.ordered_sections:
+            if len(sec) != ksec:
+                continue
+            newsectionsizes[sec] = int(round(((sum(
+                [self.scale[i + total] for i in xrange(self.section_sizes[sec])]
+                ))) / scale + 0.5))
+            total += 1
+
+        for lenk in xrange(ksec - 1, 0, -1):
+            for sec in self.ordered_sections:
+                if len(sec) != lenk:
+                    continue
+                newsectionsizes[sec] = sum(
+                    [newsectionsizes[sec2] for sec2 in self.section_sizes
+                     if not set(sec).difference(sec2) and len(sec2) == lenk + 1]
+                    )
+
+        newsize = 0
+        newsections = []
+        for sec in self.ordered_sections:
+            if len(sec) != ksec:
+                continue           
+            newsections.extend([tuple(list(sec) +
+                                      ['%04d' % (i + len(newsections))])
+                                for i in range(newsectionsizes[sec])])
+            newsize += newsectionsizes[sec]
+
+        # rescale each cell
+        # grouped cells are never belonging from different 
+        # sections (i.e. chromosomes)
         vals = {}
-        maxlen = len(max(self.section_sizes.keys(), key=len))
-        sec2scale = dict([(sec, sum([self.scale[i] for i in xrange(self._size)
-                                     if sec == self.sections[i][:-1]])
-                           / self.section_sizes[sec])
-                          for sec in self.section_sizes])
-        newsize = sum([self.section_sizes[sec] * sec2scale[sec] / scale
-                       for sec in self.section_sizes if len(sec) == maxlen])
-        newsections = [sec for sec in self.section_sizes
-                       for i in xrange(self._size)
-                       if sec == self.sections[i][:-1]]
-        print newsections
-        # j = 0
-        # for supsec in newsections:
-        #     for i in xrange(self.section_sizes[supsec]):
-        #         newsections[i+j] = supsec
-        #     j += i
+        plusr = 0
         for row in xrange(self._size):
-            newrow = row  * self.scale[row] / scale
+            newrow = (row + plusr) * self.scale[row + plusr] / scale
+            while self.sections[row][:-1] != newsections[newrow][:-1]:
+                plusr  += 1
+                newrow = (row + plusr) * self.scale[row + plusr] / scale
+            plusc = 0
             for col in xrange(self._size):
-                newcol = col * self.scale[col] / scale
-                cell = (newcol) + (newrow) * newsize
+                newcol = (col + plusc) * self.scale[col + plusc] / scale
+                while self.sections[col][:-1] != newsections[newcol][:-1]:
+                    plusc += 1
+                    newcol = (plusc + col) * self.scale[plusc + col] / scale
+                cell = newcol + newrow * newsize
                 vals.setdefault(cell, 0)
                 vals[cell] += self[row * self._size + col]
 
@@ -166,7 +199,7 @@ class InteractionMatrix(dict):
             vals.items(), newsize,
             normalized=self.normalized,
             normalization=self._normalization + ' inherited',
-            sections = newsections,
+            sections = newsections, scale=scale,
             name = self.name + ('_scaled:%s' % (scale)))
        
 
