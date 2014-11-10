@@ -193,7 +193,7 @@ def main():
         packages     = ['pytadbit', 'pytadbit.parsers',
                         'pytadbit.boundary_aligner', 'pytadbit.utils',
                         'pytadbit.tad_clustering', 'pytadbit.imp',
-                        'pytadbit.visual'],
+                        'pytadbit.visual', 'pytadbit.mapping'],
         # py_modules   = ["pytadbit"],
         platforms = "OS Independent",
         license = "GPLv3",
