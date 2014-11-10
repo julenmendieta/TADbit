@@ -125,13 +125,14 @@ def autoreader(f):
     return tuple([a for line in items for a in line]), ncol, header
 
 
-def read_matrix(things, parser=None, hic=True):
+def read_matrix(things, scale=1, parser=None, hic=True):
     """
     Read and checks a matrix from a file (using
     :func:`pytadbit.parser.hic_parser.autoreader`) or a list.
 
     :param things: might be either a file name, a file handler or a list of
         list (all with same length)
+    :param 1 scale: resolution of the matrix
     :param None parser: a parser function that returns a tuple of lists
        representing the data matrix,
        with this file example.tsv:
@@ -167,7 +168,7 @@ def read_matrix(things, parser=None, hic=True):
             matrix, size, header = parser(thing)
             thing.close()
             matrices.append(InteractionMatrix([(i, matrix[i]) for i in xrange(size**2)
-                                               if matrix[i]], size))
+                                               if matrix[i]], size, scale=scale))
         elif isinstance(thing, str):
             try:
                 matrix, size, header = parser(gzopen(thing))
@@ -177,7 +178,8 @@ def read_matrix(things, parser=None, hic=True):
                 else:
                     raise IOError('\n   ERROR: file %s not found\n' % thing)
             matrices.append(InteractionMatrix([(i, matrix[i]) for i in xrange(size**2)
-                                               if matrix[i]], size, sections=header))
+                                               if matrix[i]], size, sections=header,
+                                              scale=scale))
         elif isinstance(thing, list):
             if all([len(thing)==len(l) for l in thing]):
                 matrix  = reduce(lambda x, y: x+y, thing)
@@ -186,7 +188,7 @@ def read_matrix(things, parser=None, hic=True):
                 print thing
                 raise Exception('must be list of lists, all with same length.')
             matrices.append(InteractionMatrix([(i, matrix[i]) for i in xrange(size**2)
-                                               if matrix[i]], size))
+                                               if matrix[i]], size, scale=scale))
         elif isinstance(thing, tuple):
             # case we know what we are doing and passing directly list of tuples
             matrix = thing
@@ -195,7 +197,7 @@ def read_matrix(things, parser=None, hic=True):
                 raise AttributeError('ERROR: matrix should be square.\n')
             size = int(siz)
             matrices.append(InteractionMatrix([(i, matrix[i]) for i in xrange(size**2)
-                                               if matrix[i]], size))
+                                               if matrix[i]], size, scale=scale))
         elif 'matrix' in str(type(thing)):
             try:
                 row, col = thing.shape
@@ -206,7 +208,7 @@ def read_matrix(things, parser=None, hic=True):
             except Exception as exc:
                 print 'Error found:', exc
             matrices.append(InteractionMatrix([(i, matrix[i]) for i in xrange(size**2)
-                                               if matrix[i]], size))
+                                               if matrix[i]], size, scale=scale))
         else:
             raise Exception('Unable to read this file or whatever it is :)')
 

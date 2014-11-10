@@ -138,21 +138,27 @@ class InteractionMatrix(dict):
         :param resolution: should be multiple of actual resolution
         """
         vals = {}
-        maxlen = max(self.section_sizes.keys(), key=len)
-        newsize = [self.section_sizes[sec] * self.scale / scale
-                   for sec in self.section_sizes if len(sec) == maxlen]
-        newsections = [None for i in xrange(newsize)]
+        maxlen = len(max(self.section_sizes.keys(), key=len))
+        sec2scale = dict([(sec, sum([self.scale[i] for i in xrange(self._size)
+                                     if sec == self.sections[i][:-1]])
+                           / self.section_sizes[sec])
+                          for sec in self.section_sizes])
+        newsize = sum([self.section_sizes[sec] * sec2scale[sec] / scale
+                       for sec in self.section_sizes if len(sec) == maxlen])
+        newsections = [sec for sec in self.section_sizes
+                       for i in xrange(self._size)
+                       if sec == self.sections[i][:-1]]
+        print newsections
+        # j = 0
+        # for supsec in newsections:
+        #     for i in xrange(self.section_sizes[supsec]):
+        #         newsections[i+j] = supsec
+        #     j += i
         for row in xrange(self._size):
             newrow = row  * self.scale[row] / scale
-            if oldsec and self.sections[row][-2] != oldsec:
-                pass # TODO
-            if newsections[newrow]:
-                newsections[newrow] = self.sections[row]
-            else:
-                newsections[newrow][-1] = None # TODO
             for col in xrange(self._size):
                 newcol = col * self.scale[col] / scale
-                cell = newcol + newrow * newsize
+                cell = (newcol) + (newrow) * newsize
                 vals.setdefault(cell, 0)
                 vals[cell] += self[row * self._size + col]
 
@@ -160,14 +166,14 @@ class InteractionMatrix(dict):
             vals.items(), newsize,
             normalized=self.normalized,
             normalization=self._normalization + ' inherited',
-            sections = [self.sections[i] for i in idxs],
-            name = self.name + ('%s-%s' % focus))
+            sections = newsections,
+            name = self.name + ('_scaled:%s' % (scale)))
        
 
     def get_sample(self, focus):
         """
         pick portion of the matrix
-        :param None focus: a tuple with (start, end) positions to print. These
+        :param focus: a tuple with (start, end) positions to print. These
            positions are not genomic coordinates but bin indexes.
         """
         idxs = range(focus[0], focus[1])
