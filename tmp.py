@@ -73,7 +73,7 @@ a.write('lala.abc.gzip', format='abc', gzip=True)
 
 # d = a.get_sample((10,50))
 
-e = a.get_scaled(80000)
+e = a.get_scaled(90000)
 print '\n'.join(['\t'.join([str(a[i, j]) for j in xrange(a._size)]) for i in xrange(a._size)])
 print '-'*80
 print '\n'.join(['\t'.join([str(e[i, j]) for j in xrange(e._size)]) for i in xrange(e._size)])

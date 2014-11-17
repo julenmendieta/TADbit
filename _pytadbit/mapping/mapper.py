@@ -64,6 +64,7 @@ def iterative_mapping(gem_index_path, fastq_path, out_sam_path,
     mismatches          = kwargs.get('mismatches'          , 0.04)
     nthreads            = kwargs.get('nthreads'            , 4)
     max_reads_per_chunk = kwargs.get('max_reads_per_chunk', -1)
+    out_files           = kwargs.get('out_files'          , [])
     temp_dir = os.path.abspath(os.path.expanduser(
         kwargs.get('temp_dir', tempfile.gettempdir())))
 
@@ -84,23 +85,23 @@ def iterative_mapping(gem_index_path, fastq_path, out_sam_path,
         print '%d chunks obtained' % len(chunked_files)
         for i, fastq_chunk_path in enumerate(chunked_files):
             print 'Run iterative_mapping recursively on %s' % fastq_chunk_path
-            iterative_mapping(
+            out_files.extend(iterative_mapping(
                 gem_index_path, fastq_chunk_path,
                 out_sam_path + '.%d' % (i + 1), range_start[:], range_stop[:],
-                **kwargs)
+                **kwargs))
 
             # Delete chunks only if the file was really chunked.
             if len(chunked_files) > 1:
                 print 'Remove the chunks: %s' % ' '.join(chunked_files)
                 os.remove(fastq_chunk_path)
-        return
+        return out_files
 
     # end position according to sequence in the file
     try:
         seq_end = range_stop.pop(0)
         seq_beg = range_start.pop(0)
     except IndexError:
-        return
+        return out_files
 
     # define what we trim
     seq_len = seq_end - seq_beg
@@ -108,6 +109,7 @@ def iterative_mapping(gem_index_path, fastq_path, out_sam_path,
 
     # output
     local_out_sam = out_sam_path + '.%d' % (seq_len)
+    out_files.append(local_out_sam)
     # input
     inputf = gem.files.open(fastq_path)
 
@@ -128,20 +130,17 @@ def iterative_mapping(gem_index_path, fastq_path, out_sam_path,
     sam = gem.gem2sam(mapped, index=gem_index_path, output=local_out_sam,
                       threads=nthreads, single_end=single_end)
 
-    # Check if the next iteration is required.
-    if not range_stop:
-        return
-
     # Recursively go to the next iteration.
     unmapped_fastq_path = os.path.join(
         temp_dir, os.path.split(fastq_path)[1] + '.%d' % seq_len)
     _filter_unmapped_fastq(fastq_path, local_out_sam, unmapped_fastq_path)
 
-    iterative_mapping(gem_index_path, unmapped_fastq_path,
-                      out_sam_path,
-                      range_start, range_stop, **kwargs)
+    out_files.extend(iterative_mapping(gem_index_path, unmapped_fastq_path,
+                                       out_sam_path,
+                                       range_start, range_stop, **kwargs))
 
     os.remove(unmapped_fastq_path)
+    return out_files
 
 def _line_count(path):
     '''Count the number of lines in a file. The function was posted by

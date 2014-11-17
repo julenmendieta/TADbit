@@ -3,3 +3,6 @@
 
 
 """
+
+from genome_parser import parse_fasta
+from sam_parser    import parse_sam
