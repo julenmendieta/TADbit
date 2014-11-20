@@ -26,6 +26,7 @@ def parse_sam(f_names1, f_names2, frags, out_file1, out_file2, verbose=False):
     frag_count = frags['_frag_count']
 
     fnames = f_names1, f_names2
+    outfiles = out_file1, out_file2
     for read in range(2):
         if verbose:
             print 'Loading read' + str(read + 1)
@@ -63,7 +64,7 @@ def parse_sam(f_names1, f_names2, frags, out_file1, out_file2, verbose=False):
                 frag_count[(crm, prev_re)] += 1
                 reads.append('%s\t%s\t%d\t%d\t%d\t%d\t%d\n' % (
                     name, crm, pos, positive, len_seq, prev_re, next_re))
-        reads_fh = open('results_1/reads%d.tsv' % (read + 1), 'w')
+        reads_fh = open(outfiles[read], 'w')
         reads_fh.write(''.join(sorted(reads)))
         reads_fh.close()
     del(reads)
