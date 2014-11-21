@@ -7,6 +7,21 @@ Definition and mapping of restriction enymes
 from re import compile
 
 
+def count_re_fragments(fnam):
+    frag_count = {}
+    for line in open(fnam):
+        _, cr1, _, _, _, rs1, _, cr2, _, _, _, rs2, _ = line.split()
+        try:
+            frag_count[(cr1, int(rs1))] += 1
+        except KeyError:
+            frag_count[(cr1, int(rs1))] = 1
+        try:
+            frag_count[(cr2, int(rs2))] += 1
+        except KeyError:
+            frag_count[(cr2, int(rs2))] = 1
+    return frag_count
+
+
 """genome_seq = dict([(crm, ''.join([line.strip() for line in open('dmel_reference/chr%s.fa' % crm).readlines()[1:]]).upper()) for crm in ('2R', '2L', '3L', '3R', '4', 'X')])
 """
 def map_re_sites(enzyme_name, genome_seq, frag_chunk=100000, verbose=False):
@@ -23,21 +38,17 @@ def map_re_sites(enzyme_name, genome_seq, frag_chunk=100000, verbose=False):
     enzyme      = RESTRICTION_ENZYMES[enzyme_name]
     enz_pattern = compile(enzyme.replace('|', ''))
     enz_cut     = enzyme.index('|')
-
-    frags = {'_chunk_size': frag_chunk,
-             '_frag_count': {}}
+    frags = {}
     count = 0
     for crm in genome_seq:
         seq = genome_seq[crm]
         frags[crm] = dict([(i, []) for i in xrange(len(seq) / frag_chunk + 1)])
         frags[crm][0] = [0]
         frags[crm][len(seq) / frag_chunk] = [len(seq)]
-        frags['_frag_count'][(crm, 0)] = 0
         for match in enz_pattern.finditer(seq):
             pos = match.start() + enz_cut
             frags[crm][pos / frag_chunk].append(pos)
             count += 1
-            frags['_frag_count'][(crm, pos)] = 0
         for i in xrange(len(seq) / frag_chunk + 1):
             try:
                 try:

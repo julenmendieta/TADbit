@@ -3,7 +3,8 @@
 from pytadbit._version                 import __version__
 from pytadbit.tadbit                   import tadbit, batch_tadbit, find_tads
 from pytadbit.chromosome               import Chromosome
-from pytadbit.experiment               import Experiment
+from pytadbit.interaction_matrix       import InteractionMatrix
+from pytadbit.experiment               import Experiment, load_experiment_from_reads
 from pytadbit.alignment                import Alignment, randomization_test, align_experiments
 from pytadbit.chromosome               import load_chromosome
 from pytadbit.imp.structuralmodels     import StructuralModels

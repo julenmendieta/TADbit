@@ -11,7 +11,9 @@ import subprocess
 import gzip
 import pysam
 import gem
+from pytadbit import InteractionMatrix
 
+    
 
 def get_intersection(fname1, fname2, out_path, verbose=False):
     """

@@ -20,7 +20,7 @@ class InteractionMatrix(dict):
     :param None scale: can be either a single number if all rows represent the
        same number of nucleotides, or a list if not.
     """
-    def __init__(self, items, size, name=None, sections=None, normalized=False,
+    def __init__(self, items, size, sections, name=None, normalized=False,
                  normalization=None, scale=1, section_sizes=None,
                  ordered_sections=None):
         super(InteractionMatrix, self).__init__(items)
@@ -30,12 +30,7 @@ class InteractionMatrix(dict):
         self.normalized = normalized
         self._normalization = normalization or 'None'
         self.bias = None
-        if not sections:
-            # create sections...
-            self.sections = [(item, ) for item in items]
-        else:
-            self.sections = sections
-
+        self.sections = sections
         # calculate the size of each section
         self.section_sizes = {}
         self.ordered_sections = ordered_sections
@@ -43,10 +38,10 @@ class InteractionMatrix(dict):
             self.section_sizes = section_sizes
         else:
             self.__size_sections__()
-
         self.scale = scale if (isinstance(scale, list) or
                                isinstance(scale, tuple)) else Scale((scale, ))
         self._real_size = sum([self.scale[i] for i in xrange(self._size)])
+
 
     def __size_sections__(self):
         self.ordered_sections = []
@@ -63,8 +58,10 @@ class InteractionMatrix(dict):
                 self.section_sizes.setdefault(key, 0)
                 self.section_sizes[key] += 1
 
+
     def __len__(self):
         return self._size
+
 
     def __getitem__(self, row_col):
         """
@@ -84,6 +81,7 @@ class InteractionMatrix(dict):
                     'ERROR: position %d larger than %s^2' % (row_col,
                                                              self._size))
             return self.get(row_col, 0)
+
 
     def write(self, fname, format='pik', gzip=True, headers=True, focus=None):
         """
@@ -263,6 +261,7 @@ class InteractionMatrix(dict):
             new_im.sections.append(self.sections[idxs[k]][:pos] +
                                    self.sections[idxs[k]][pos + 1:])
         return new_im
+
 
     def get_as_tuple(self):
         """

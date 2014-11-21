@@ -1,7 +1,6 @@
 """
 20 Feb 2013
 
-
 """
 
 from pytadbit.parsers.hic_parser   import read_matrix
@@ -30,6 +29,68 @@ try:
     from matplotlib.cm import jet
 except ImportError:
     stderr.write('matplotlib not found\n')
+
+
+def load_experiment_from_reads(name, fnam, genome_seq, resolution, 
+                               conditions=None, identifier=None, cell_type=None,
+                               enzyme=None, exp_type='Hi-C', **kw_descr):
+    """
+    :param fnam: tsv file with reads1 and reads2
+    :param name: name of the experiment
+    :param resolution: the resolution of the experiment (size of a bin in
+       bases)
+    :param None identifier: some identifier relative to the Hi-C data
+    :param None cell_type: cell type on which the experiment was done
+    :param None enzyme: restriction enzyme used in  the Hi-C experiment
+    :param Hi-C exp_type: name of the experiment used (currently only Hi-C is
+       supported)
+    :param None conditions: :py:func:`list` of experimental conditions, e.g. 
+       the cell type, the enzyme... (i.e.: ['HindIII', 'cortex', 'treatment']).
+       This parameter may be used to compare the effect of this conditions on
+       the TADs
+    :param None kw_descr: any other argument passed would be stored as
+       complementary descriptive field. For example::
+       
+           exp  = Experiment('k562_rep2', resolution=100000,
+                             identifier='SRX015263', cell_type='K562',
+                             enzyme='HindIII', cylce='synchronized')
+           print exp
+
+           # Experiment k562_rep2:
+           #    resolution        : 100Kb
+           #    TADs              : None
+           #    Hi-C rows         : None
+           #    normalized        : None
+           #    identifier        : SRX015263
+           #    cell type         : K562
+           #    restriction enzyme: HindIII
+           #    cylce             : synchronized
+
+       *note that these fields may appear in the header of generated out files*
+    """
+    size = 0
+    section_sizes = {}
+    sections = []
+    for crm in genome_seq:
+        len_crm = int(float(len(genome_seq[crm])) / resolution + 1)
+        section_sizes[(crm,)] = len_crm
+        size += len_crm + 1
+        sections.extend([(crm, '%04d' % i) for i in xrange(len_crm + 1)])
+    imx = InteractionMatrix((), size, [])
+    dict_sec = dict([(j, i) for i, j in enumerate(sections)])
+    for line in open(fnam):
+        _, cr1, ps1, _, _, _, _, cr2, ps2, _ = line.split('\t', 9)
+        ps1 = dict_sec[(cr1, '%04d' % (int(ps1) / resolution))]
+        ps2 = dict_sec[(cr2, '%04d' % (int(ps2) / resolution))]
+        imx[ps1 + ps2 * size] += 1
+        imx[ps2 + ps1 * size] += 1
+    imx.sections = dict_sec
+    imx.__size_sections__()
+    
+    return Experiment(name, resolution=resolution, hic_data=imx,
+                      conditions=conditions, identifier=identifier,
+                      cell_type=cell_type, enzyme=enzyme, exp_type=exp_type,
+                      **kw_descr)
 
 
 class Experiment(object):
@@ -521,12 +582,25 @@ class Experiment(object):
             stderr.write('WARNING: removing previous weights\n')
         size = self.size
         remove = [i in self._zeros for i in xrange(size)]
+        # remove diagonal
+        diagonal = []
+        for i in xrange(self.size):
+            diagonal.append(self.hic_data[0][i*size+i])
+            self.hic_data[0][i*size+i] = 0
+        # do the iterative correction
         self.bias = iterative(self.hic_data[0], iterations=iterations,
                               remove=remove)
-        self.norm = [InteractionMatrix([(i + j * size, float(self.hic_data[0][i, j]) /
-                                         self.bias[i] /
-                                         self.bias[j] * size)
-                                        for i in self.bias for j in self.bias], size)]
+        # put back the diagonal
+        for i in xrange(self.size):
+            self.hic_data[0][i*size+i] = diagonal.pop(0)
+        del(diagonal)
+        # create a matrix for the normalized data
+        self.norm = [InteractionMatrix(
+            [(i + j * size, float(self.hic_data[0][i, j]) / self.bias[i] /
+              self.bias[j] * size) for i in self.bias for j in self.bias
+             if self.hic_data[0][i, j]], size,
+            sections=self.hic_data[0].sections,
+            section_sizes=self.hic_data[0].section_sizes)]
         # no need to use lists, tuples use less memory
         if factor:
             self._normalization = 'visibility_factor:' + str(factor)
