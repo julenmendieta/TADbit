@@ -598,7 +598,7 @@ class StructuralModels(object):
 
     def get_contact_matrix(self, models=None, cluster=None, 
                            stage=None, cutoff=None,
-                           distance=False):
+                           distance=False, show_bad_columns=True):
         """
         Returns a matrix with the number of interactions observed below a given
         cutoff distance.
@@ -616,6 +616,7 @@ class StructuralModels(object):
            will be a dictionnary of matrices (keys being square cutoffs)
         :param False distance: returns the distance matrix of all_angles against
            all_angles particles instead of a contact_map matrix using the cutoff
+        :param True show_bad_columns: show bad columns in contact map
 
         :returns: matrix frequency of interaction
         """
@@ -639,7 +640,11 @@ class StructuralModels(object):
         cutoff = [c**2 for c in cutoff]
         matrix = dict([(c, [[0. for _ in xrange(self.nloci)]
                             for _ in xrange(self.nloci)]) for c in cutoff])
-        wloci = [i for i in xrange(self.nloci) if self._zeros[i]]
+        # remove (or not) interactions from bad columns
+        if show_bad_columns:
+            wloci = [i for i in xrange(self.nloci) if self._zeros[i]]
+        else:
+            wloci = [i for i in xrange(self.nloci)]
         models = [self[mdl] for mdl in models]
 
         frac = 1.0 / len(models)
@@ -1740,7 +1745,8 @@ class StructuralModels(object):
                                  dynamics=False, cutoff=None,
                                  off_diag=1, plot=False, axe=None, savefig=None,
                                  corr='spearman', midplot='hexbin',
-                                 log_corr=True, contact_matrix=None):
+                                 log_corr=True, contact_matrix=None,
+                                 show_bad_columns=True):
         """
         Plots the result of a correlation between a given group of models and
         original Hi-C data.
@@ -1762,6 +1768,8 @@ class StructuralModels(object):
            appearance
         :param None contact_matrix: input a contact matrix instead of computing
            it from the models
+        :param True show_bad_columns: Wether to hide or not bad columns in the 
+            contact map
 
         :returns: correlation coefficient rho, between the two
            matrices. A rho value greater than 0.7 indicates a very good
@@ -1787,11 +1795,13 @@ class StructuralModels(object):
                 all_original_data = []
                 for st in range(0,int((len(self.stages)-1)/self.models_per_step)+1):
                     all_original_data.append(st)
-                    all_model_matrix.append(self.get_contact_matrix(stage=int(st*self.models_per_step), cutoff=cutoff))
+                    all_model_matrix.append(self.get_contact_matrix(stage=int(st*self.models_per_step), 
+                                                                    cutoff=cutoff,
+                                                                    show_bad_columns=show_bad_columns))
             else:
                 all_original_data = [0]
                 all_model_matrix = [self.get_contact_matrix(models=models, cluster=cluster,
-                                                   cutoff=cutoff)]
+                                                   cutoff=cutoff, show_bad_columns=show_bad_columns)]
         correl = {}
         for model_matrix, od in zip(all_model_matrix,all_original_data):
             oridata = []
